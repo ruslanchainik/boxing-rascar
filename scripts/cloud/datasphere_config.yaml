@@ -1,0 +1,62 @@
+name: boxing-tcn-rgb
+desc: TCN on pose+CNN(RegNetY-002) features for boxing punch detection
+
+cmd: |
+  set -e
+  pip install -r requirements.txt
+  echo "=== STEP 1: extract CNN features from RGB crops ==="
+  python extract_cnn_features.py \
+    --crops_dir input/rgb_crops \
+    --out_dir output/cnn_features \
+    --backbone regnety_002 \
+    --batch 64 \
+    --target_fps 30.0
+  echo "=== STEP 2: train TCN with pose+cnn features ==="
+  python train_tcn_rgb.py \
+    --pose_dir input/pose_features_glove \
+    --cnn_dir output/cnn_features \
+    --punches input/train/punches.csv \
+    --out output/best.pt \
+    --epochs 40 \
+    --batch_size 16 \
+    --crops_per_video 20 \
+    --hidden_dim 256 \
+    --n_blocks 8 \
+    --dropout 0.25
+  echo "=== STEP 3: predict ==="
+  python predict_tcn_rgb.py \
+    --ckpt output/best.pt \
+    --pose_dir input/pose_features_glove \
+    --cnn_dir output/cnn_features \
+    --test_videos input/test/videos.csv \
+    --sample input/sample_submission.csv \
+    --out output/submission_cloud.csv \
+    --threshold 0.6 \
+    --min_distance 6
+
+env:
+  python:
+    type: manual
+    version: '3.10'
+    requirements-file: requirements.txt
+
+inputs:
+  - rgb_crops: input/rgb_crops
+  - pose_features_glove: input/pose_features_glove
+  - train: input/train
+  - test: input/test
+  - sample_submission.csv: input/sample_submission.csv
+  - extract_cnn_features.py
+  - train_tcn_rgb.py
+  - predict_tcn_rgb.py
+
+outputs:
+  - cnn_features: output/cnn_features
+  - best.pt: output/best.pt
+  - submission_cloud.csv: output/submission_cloud.csv
+
+flags:
+  attach-project-disk: true
+
+cloud-instance-types:
+  - g2.1   # V100 32GB — ~₽100-130/hr, optimal for this workload

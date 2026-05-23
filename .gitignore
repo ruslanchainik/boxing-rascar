@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project artifacts (big, not in repo)
+artifacts/
+cloud_job/
+cloud_spot/
+eval/
+
+# Original competition data (gigabytes, owned by organizers)
+бокс/
+Турнир Бокс/
+Турнир Бокс 2/
+train/
+test/
+sample_submission.csv
+
+# Misc submissions (we keep only the best in submissions/)
+submission*.csv
+!submissions/submission_meta3_w111.csv
+
+# Logs
+*.log
+nohup.out
