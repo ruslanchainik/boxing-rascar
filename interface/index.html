@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>RingSight — AI Assistant for Boxing Officials</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      ink: { 950: '#07080b', 900: '#0b0d12', 800: '#11141b', 700: '#181c25', 600: '#252b38' },
+      accent: { 500: '#ffb547', 600: '#f59e0b' },
+      red: { fighter: '#ef3b3b' },
+      blue: { fighter: '#3b82f6' },
+    },
+    fontFamily: {
+      mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+      ui: ['Inter', 'system-ui', 'sans-serif'],
+    },
+  }}
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .scrollbar::-webkit-scrollbar { width: 6px; }
+  .scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar::-webkit-scrollbar-thumb { background: #252b38; border-radius: 4px; }
+  .pulse-dot { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.5; transform:scale(.85); } }
+  .stripe-line { background-image: repeating-linear-gradient(90deg, #1f2630 0 2px, transparent 2px 12px); }
+  .timeline-mark { transition: transform .15s; }
+  .timeline-mark.active { transform: scaleY(1.6); }
+  .glow-red   { box-shadow: 0 0 24px -4px rgba(239,59,59,.7); }
+  .glow-blue  { box-shadow: 0 0 24px -4px rgba(59,130,246,.7); }
+  .event-flash { animation: flashIn .8s ease-out; }
+  @keyframes flashIn { from { background: rgba(255,181,71,.18); transform: translateY(-4px); } to {} }
+  .live-grid { background:
+      radial-gradient(circle at 20% 30%, rgba(239,59,59,.05), transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(59,130,246,.05), transparent 40%),
+      linear-gradient(180deg,#0b0d12 0%, #07080b 100%); }
+</style>
+</head>
+
+<body class="bg-ink-950 text-zinc-200 min-h-screen live-grid">
+
+<!-- TOP BAR -->
+<header class="border-b border-ink-700 bg-ink-900/80 backdrop-blur">
+  <div class="max-w-[1920px] mx-auto px-6 py-3 flex items-center gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-accent-600 flex items-center justify-center text-ink-950 font-bold">RS</div>
+      <div>
+        <div class="text-base font-semibold tracking-wide">RingSight</div>
+        <div class="text-xs text-zinc-500">AI Assistant for Boxing Officials · v0.4 demo</div>
+      </div>
+    </div>
+
+    <nav class="ml-6 hidden md:flex items-center gap-1 text-sm">
+      <a class="px-3 py-1.5 rounded text-zinc-300 bg-ink-700">Match view</a>
+      <a class="px-3 py-1.5 rounded text-zinc-500 hover:text-zinc-200">Round report</a>
+      <a class="px-3 py-1.5 rounded text-zinc-500 hover:text-zinc-200">Calibration</a>
+      <a class="px-3 py-1.5 rounded text-zinc-500 hover:text-zinc-200">History</a>
+      <a class="px-3 py-1.5 rounded text-zinc-500 hover:text-zinc-200">Settings</a>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-3 mono text-xs text-zinc-400">
+      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>STREAM LIVE</span>
+      <span class="text-zinc-700">|</span>
+      <span>RTX 3060 · <span class="text-emerald-300">38 ms</span> latency</span>
+      <span class="text-zinc-700">|</span>
+      <span>Pose 92 fps · TCN 1.8 ms</span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button class="px-3 py-1.5 text-xs bg-ink-700 rounded hover:bg-ink-600">📷 Cameras</button>
+      <button class="px-3 py-1.5 text-xs bg-ink-700 rounded hover:bg-ink-600">⚙ Settings</button>
+      <div class="flex items-center gap-2 pl-3 border-l border-ink-700">
+        <div class="w-8 h-8 rounded-full bg-ink-700 flex items-center justify-center text-xs font-semibold">AB</div>
+        <div class="text-xs">
+          <div>Алла Б.</div>
+          <div class="text-zinc-500">Boxing referee</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MATCH INFO -->
+<div class="max-w-[1920px] mx-auto px-6 pt-4 flex items-center gap-6">
+  <div class="text-xs text-zinc-500">MATCH</div>
+  <div class="font-semibold">Турнир Бокс · Бой 9 · Вороной — Болотов</div>
+  <div class="mono text-xs text-zinc-400 bg-ink-800 px-2 py-0.5 rounded">АГН-037</div>
+  <div class="text-xs text-zinc-500 ml-auto">Round 1 of 3 · 02:38 elapsed</div>
+</div>
+
+<!-- MAIN GRID -->
+<main class="max-w-[1920px] mx-auto px-6 py-4 grid grid-cols-12 gap-4">
+
+  <!-- LEFT: VIDEO -->
+  <section class="col-span-8 space-y-4">
+    <!-- Video player mock -->
+    <div class="relative aspect-video bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
+      <!-- mock ring image (CSS-only ring scene) -->
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="text-center">
+          <div class="w-48 h-48 mx-auto rounded-full border-4 border-ink-600 flex items-center justify-center">
+            <div class="text-5xl">🥊</div>
+          </div>
+          <div class="mt-4 text-xs text-zinc-500 mono">CAMERA-1 · 1920×1080 · 30fps · H.265</div>
+        </div>
+      </div>
+
+      <!-- top overlay: clock + round -->
+      <div class="absolute top-4 left-4 right-4 flex justify-between items-start text-sm">
+        <div class="bg-black/60 rounded px-3 py-1.5 backdrop-blur">
+          <div class="mono text-xs text-zinc-400">FRAME / TIME</div>
+          <div class="mono text-lg"><span id="frame">2287</span> · <span id="time">02:38.2</span></div>
+        </div>
+        <div class="bg-black/60 rounded px-3 py-1.5 backdrop-blur">
+          <div class="mono text-xs text-zinc-400">ROUND</div>
+          <div class="text-lg font-semibold text-accent-500">1 / 3</div>
+        </div>
+      </div>
+
+      <!-- fighter labels -->
+      <div class="absolute bottom-4 left-4 flex items-center gap-3 bg-red-fighter/15 border border-red-fighter/40 rounded px-3 py-2">
+        <div class="w-3 h-3 rounded-full bg-red-fighter"></div>
+        <div>
+          <div class="text-sm font-semibold">RED · Вороной</div>
+          <div class="text-xs text-zinc-400 mono">left-handed · guard up</div>
+        </div>
+      </div>
+      <div class="absolute bottom-4 right-4 flex items-center gap-3 bg-blue-fighter/15 border border-blue-fighter/40 rounded px-3 py-2">
+        <div class="w-3 h-3 rounded-full bg-blue-fighter"></div>
+        <div class="text-right">
+          <div class="text-sm font-semibold">Болотов · BLUE</div>
+          <div class="text-xs text-zinc-400 mono">orthodox · pressuring</div>
+        </div>
+      </div>
+
+      <!-- live detect overlay placeholder boxes -->
+      <div class="absolute left-[28%] top-[30%] w-32 h-56 border-2 border-red-fighter/70 rounded">
+        <div class="absolute -top-5 left-0 text-[10px] mono bg-red-fighter/80 text-black px-1 rounded">RED 0.94</div>
+      </div>
+      <div class="absolute right-[28%] top-[28%] w-32 h-60 border-2 border-blue-fighter/70 rounded">
+        <div class="absolute -top-5 left-0 text-[10px] mono bg-blue-fighter/80 text-black px-1 rounded">BLUE 0.97</div>
+      </div>
+      <!-- glove markers -->
+      <div class="absolute left-[34%] top-[42%] w-4 h-4 bg-red-fighter rounded-full glow-red"></div>
+      <div class="absolute left-[44%] top-[44%] w-4 h-4 bg-red-fighter/70 rounded-full"></div>
+      <div class="absolute right-[34%] top-[40%] w-4 h-4 bg-blue-fighter rounded-full glow-blue"></div>
+      <div class="absolute right-[44%] top-[42%] w-4 h-4 bg-blue-fighter/70 rounded-full"></div>
+
+      <!-- bottom controls -->
+      <div class="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent flex items-center gap-3">
+        <button id="playBtn" class="w-10 h-10 rounded-full bg-accent-500 text-ink-950 font-bold flex items-center justify-center text-lg hover:bg-accent-600">▶</button>
+        <button class="w-9 h-9 rounded-full bg-ink-700 hover:bg-ink-600 flex items-center justify-center text-sm">⏮</button>
+        <button class="w-9 h-9 rounded-full bg-ink-700 hover:bg-ink-600 flex items-center justify-center text-sm">⏭</button>
+        <div class="flex-1 mono text-xs text-zinc-400 ml-2">SPEED 1.0× · zoom 100% · slow-mo OFF</div>
+        <button class="px-3 py-1.5 text-xs bg-ink-700 rounded hover:bg-ink-600">Slow-mo</button>
+        <button class="px-3 py-1.5 text-xs bg-ink-700 rounded hover:bg-ink-600">Pose overlay</button>
+        <button class="px-3 py-1.5 text-xs bg-ink-700 rounded hover:bg-ink-600">⊞ Cam 2</button>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="bg-ink-900 rounded-xl border border-ink-700 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold">Round timeline</div>
+        <div class="flex items-center gap-3 text-xs text-zinc-400">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-fighter"></span>RED hits</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-fighter"></span>BLUE hits</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-zinc-500"></span>Clinch</span>
+        </div>
+      </div>
+      <div id="timeline" class="relative h-16 stripe-line rounded-lg overflow-hidden">
+        <!-- 6 minute round -->
+        <div id="cursor" class="absolute top-0 bottom-0 w-px bg-accent-500" style="left: 43.8%">
+          <div class="absolute -top-2 -left-1.5 w-3 h-3 rounded-full bg-accent-500"></div>
+        </div>
+        <!-- events injected via JS -->
+      </div>
+      <div class="flex justify-between mono text-[10px] text-zinc-500 mt-1.5">
+        <span>0:00</span>
+        <span>1:00</span>
+        <span>2:00</span>
+        <span>3:00</span>
+        <span>4:00</span>
+        <span>5:00</span>
+        <span>6:00</span>
+      </div>
+    </div>
+
+    <!-- BOTTOM: score breakdown -->
+    <div class="grid grid-cols-2 gap-4">
+      <!-- RED scorecard -->
+      <div class="bg-ink-900 rounded-xl border border-red-fighter/30 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-red-fighter"></div>
+            <span class="font-semibold">RED · Вороной</span>
+          </div>
+          <div class="text-3xl font-bold text-red-fighter mono" id="red-score">38</div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center text-xs">
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">12</div><div class="text-zinc-500 mt-1">jab</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">9</div><div class="text-zinc-500 mt-1">cross</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">14</div><div class="text-zinc-500 mt-1">hook</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">3</div><div class="text-zinc-500 mt-1">uppercut</div></div>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">landed</span><span class="mono text-emerald-300">21</span></div>
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">blocked</span><span class="mono text-amber-300">10</span></div>
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">miss</span><span class="mono text-zinc-400">7</span></div>
+        </div>
+      </div>
+
+      <!-- BLUE scorecard -->
+      <div class="bg-ink-900 rounded-xl border border-blue-fighter/30 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-blue-fighter"></div>
+            <span class="font-semibold">BLUE · Болотов</span>
+          </div>
+          <div class="text-3xl font-bold text-blue-fighter mono" id="blue-score">42</div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center text-xs">
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">8</div><div class="text-zinc-500 mt-1">jab</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">16</div><div class="text-zinc-500 mt-1">cross</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">15</div><div class="text-zinc-500 mt-1">hook</div></div>
+          <div class="bg-ink-800 rounded p-2"><div class="mono text-base">3</div><div class="text-zinc-500 mt-1">uppercut</div></div>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">landed</span><span class="mono text-emerald-300">28</span></div>
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">blocked</span><span class="mono text-amber-300">8</span></div>
+          <div class="flex justify-between bg-ink-800 rounded px-2 py-1.5"><span class="text-zinc-500">miss</span><span class="mono text-zinc-400">6</span></div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- RIGHT: live events feed + tools -->
+  <aside class="col-span-4 space-y-4">
+
+    <!-- Pace / quick stats -->
+    <div class="bg-ink-900 rounded-xl border border-ink-700 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold">Round pace</div>
+        <div class="text-xs text-zinc-500">last 30 s window</div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <div class="text-xs text-zinc-500 mb-1">Punches / min</div>
+          <div class="mono text-2xl">42</div>
+          <div class="mono text-[11px] text-emerald-300">↑ 8% vs avg</div>
+        </div>
+        <div>
+          <div class="text-xs text-zinc-500 mb-1">Land rate</div>
+          <div class="mono text-2xl">61%</div>
+          <div class="mono text-[11px] text-zinc-400">avg 58%</div>
+        </div>
+        <div>
+          <div class="text-xs text-zinc-500 mb-1">Aggressor</div>
+          <div class="mono text-2xl text-blue-fighter">BLUE</div>
+          <div class="mono text-[11px] text-zinc-400">62% initiation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live event feed -->
+    <div class="bg-ink-900 rounded-xl border border-ink-700">
+      <div class="flex items-center justify-between p-4 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="text-sm font-semibold">Detected punches</div>
+          <span class="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded">LIVE</span>
+        </div>
+        <button class="text-xs text-zinc-400 hover:text-zinc-200">⛓ Filter</button>
+      </div>
+
+      <div id="events" class="px-3 pb-3 space-y-2 scrollbar overflow-y-auto" style="max-height: 480px;"></div>
+
+      <div class="border-t border-ink-700 p-3 flex items-center gap-2">
+        <button class="flex-1 text-xs bg-ink-700 rounded py-2 hover:bg-ink-600">+ Mark manual event</button>
+        <button class="flex-1 text-xs bg-ink-700 rounded py-2 hover:bg-ink-600">↺ Undo last</button>
+      </div>
+    </div>
+
+    <!-- Model confidence panel -->
+    <div class="bg-ink-900 rounded-xl border border-ink-700 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold">Detector confidence (last event)</div>
+        <span class="text-xs text-zinc-500 mono">19 model ensemble</span>
+      </div>
+      <div class="space-y-2 text-xs">
+        <div>
+          <div class="flex justify-between mb-1"><span>Event present</span><span class="mono text-emerald-300">0.93</span></div>
+          <div class="h-1.5 bg-ink-800 rounded"><div class="h-full bg-emerald-400 rounded" style="width:93%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>Fighter = blue</span><span class="mono text-blue-fighter">0.81</span></div>
+          <div class="h-1.5 bg-ink-800 rounded"><div class="h-full bg-blue-fighter rounded" style="width:81%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>Type = cross</span><span class="mono text-amber-300">0.64</span></div>
+          <div class="h-1.5 bg-ink-800 rounded"><div class="h-full bg-amber-400 rounded" style="width:64%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>Hand = left</span><span class="mono text-zinc-300">0.72</span></div>
+          <div class="h-1.5 bg-ink-800 rounded"><div class="h-full bg-zinc-400 rounded" style="width:72%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>Effectiveness = landed</span><span class="mono text-emerald-300">0.86</span></div>
+          <div class="h-1.5 bg-ink-800 rounded"><div class="h-full bg-emerald-400 rounded" style="width:86%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Round controls -->
+    <div class="grid grid-cols-2 gap-3">
+      <button class="bg-accent-500 text-ink-950 rounded-lg py-3 text-sm font-semibold hover:bg-accent-600">📋 Export round report</button>
+      <button class="bg-ink-700 rounded-lg py-3 text-sm hover:bg-ink-600">⛯ Recalibrate cameras</button>
+      <button class="bg-ink-700 rounded-lg py-3 text-sm hover:bg-ink-600">🧮 Score sheet</button>
+      <button class="bg-red-900/40 text-red-300 rounded-lg py-3 text-sm hover:bg-red-900/60">⏹ Stop round</button>
+    </div>
+
+    <div class="text-[10px] text-zinc-600 leading-relaxed">
+      Demo build · running on pose-only 19-model TCN ensemble
+      (LB 0.167 on RASCAR Box). Not yet certified for official scoring.
+    </div>
+
+  </aside>
+</main>
+
+<script>
+// ----- mock event stream from real predictions of agn_037 -----
+const EVENTS = [
+  {f: 2247, fighter:'blue', type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.94},
+  {f: 2289, fighter:'blue', type:'cross',   hand:'left',  target:'head', eff:'miss',    score:0.71},
+  {f: 2329, fighter:'blue', type:'cross',   hand:'left',  target:'head', eff:'landed',  score:0.88},
+  {f: 2622, fighter:'red',  type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.92},
+  {f: 2787, fighter:'blue', type:'cross',   hand:'left',  target:'head', eff:'landed',  score:0.86},
+  {f: 3050, fighter:'red',  type:'cross',   hand:'left',  target:'head', eff:'landed',  score:0.79},
+  {f: 3079, fighter:'blue', type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.83},
+  {f: 3104, fighter:'red',  type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.81},
+  {f: 3732, fighter:'blue', type:'hook',    hand:'left',  target:'head', eff:'landed',  score:0.74},
+  {f: 3816, fighter:'red',  type:'cross',   hand:'left',  target:'head', eff:'landed',  score:0.88},
+  {f: 3895, fighter:'blue', type:'jab',     hand:'right', target:'head', eff:'blocked', score:0.66},
+  {f: 3916, fighter:'blue', type:'cross',   hand:'right', target:'head', eff:'miss',    score:0.59},
+  {f: 4040, fighter:'blue', type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.90},
+  {f: 4088, fighter:'red',  type:'jab',     hand:'left',  target:'head', eff:'miss',    score:0.55},
+  {f: 4142, fighter:'blue', type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.87},
+  {f: 4262, fighter:'blue', type:'hook',    hand:'right', target:'head', eff:'landed',  score:0.85},
+  {f: 4608, fighter:'blue', type:'cross',   hand:'right', target:'head', eff:'landed',  score:0.82},
+];
+const FPS = 30, ROUND_FRAMES = 30*180; // 3 min in frames @30fps
+
+// Build timeline marks
+const tl = document.getElementById('timeline');
+EVENTS.forEach((e, i) => {
+  const left = Math.min(98, (e.f - 2200) / (ROUND_FRAMES + 200) * 100); // visual mapping for demo
+  const colour = e.fighter === 'red' ? '#ef3b3b' : '#3b82f6';
+  const m = document.createElement('div');
+  m.className = 'timeline-mark absolute top-2 bottom-2 w-1 rounded';
+  m.style.left = `${left}%`;
+  m.style.background = colour;
+  m.style.opacity = e.eff === 'landed' ? '1' : (e.eff === 'blocked' ? '.55' : '.3');
+  m.dataset.idx = i;
+  tl.appendChild(m);
+});
+
+// Render event cards (most recent first)
+const feed = document.getElementById('events');
+function eventCard(e, isLatest=false) {
+  const fighterColor = e.fighter === 'red' ? 'red-fighter' : 'blue-fighter';
+  const fighterText = e.fighter === 'red' ? 'RED' : 'BLUE';
+  const effPill = ({
+    landed:  'bg-emerald-500/20 text-emerald-300',
+    blocked: 'bg-amber-500/20 text-amber-300',
+    miss:    'bg-zinc-700 text-zinc-400',
+  })[e.eff];
+  const t = `${Math.floor(e.f/FPS/60).toString().padStart(2,'0')}:${(Math.floor(e.f/FPS)%60).toString().padStart(2,'0')}.${Math.floor((e.f%FPS)/FPS*10)}`;
+  return `
+    <div class="${isLatest ? 'event-flash' : ''} bg-ink-800 rounded-lg p-3 border-l-2" style="border-color:${e.fighter==='red'?'#ef3b3b':'#3b82f6'}">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-xs font-semibold" style="color:${e.fighter==='red'?'#ef3b3b':'#3b82f6'}">${fighterText}</span>
+            <span class="text-sm font-semibold uppercase">${e.type}</span>
+            <span class="text-xs text-zinc-500">· ${e.hand} · ${e.target}</span>
+          </div>
+          <div class="mono text-[11px] text-zinc-500">frame ${e.f} · ${t} · conf ${e.score.toFixed(2)}</div>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded uppercase mono ${effPill}">${e.eff}</span>
+      </div>
+    </div>`;
+}
+
+// Show last 8 events initially
+let cursor = 12;
+feed.innerHTML = EVENTS.slice(0, cursor).reverse().map(e => eventCard(e)).join('');
+
+// Cycle latest event highlight every few seconds (mock live)
+setInterval(() => {
+  if (cursor >= EVENTS.length) cursor = 12;
+  const e = EVENTS[cursor];
+  feed.insertAdjacentHTML('afterbegin', eventCard(e, true));
+  // keep only last 12 cards
+  while (feed.children.length > 12) feed.lastElementChild.remove();
+  // move cursor on timeline
+  const left = Math.min(98, (e.f - 2200) / (ROUND_FRAMES + 200) * 100);
+  document.getElementById('cursor').style.left = `${left}%`;
+  // update frame/time display
+  document.getElementById('frame').textContent = e.f;
+  const sec = e.f / FPS;
+  document.getElementById('time').textContent =
+    `${Math.floor(sec/60).toString().padStart(2,'0')}:${(sec%60).toFixed(1).padStart(4,'0')}`;
+  // update scores (mock)
+  document.getElementById('red-score').textContent = 38 + Math.floor((cursor-12)/2);
+  document.getElementById('blue-score').textContent = 42 + Math.floor((cursor-12)/1.5);
+  cursor++;
+}, 3500);
+
+// Play button toggle
+const playBtn = document.getElementById('playBtn');
+playBtn.addEventListener('click', () => {
+  playBtn.textContent = playBtn.textContent === '▶' ? '⏸' : '▶';
+});
+</script>
+</body>
+</html>
